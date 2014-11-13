@@ -2,6 +2,7 @@ import sys
 import os
 #sys.path.append(sys.argv[1])
 import numpy as np
+import argparse
 
 def saveLs (dataAn, field_r, field_c, fields_beta, classf, fields_cut, cuts, bins, Ns,
             minElementsBin, N_calc, out_path, txt = ""):
@@ -23,6 +24,21 @@ def saveLs (dataAn, field_r, field_c, fields_beta, classf, fields_cut, cuts, bin
             file.close ()
 
 from data_analysers.BiasAnalyser import *
+
+parser = argparse.ArgumentParser(description='Calculate labeling bias of a data-set.')
+
+parser.add_argument("table_file", metavar = "table_file", type = file, nargs = 1, 
+                    help = "table with variables and labels.")
+parser.add_argument("label_name", help = "name of the column containing the labels.")
+parser.add_argument("--number_objects", metavar = "N", type = int, nargs = 1, 
+                    help = "number of objects to be used for calculating the bias.")
+
+args = parser.parse_args()
+print args.label_name 
+if (args.number_objects):
+    print "N"
+
+exit()
 
 field_r = "petroRad_r_kpc"
 field_c = "absPetroMag_r"
