@@ -1,6 +1,6 @@
 import sys
 import os
-sys.path.append(sys.argv[1])
+#sys.path.append(sys.argv[1])
 import numpy as np
 
 def saveLs (dataAn, field_r, field_c, fields_beta, classf, fields_cut, cuts, bins, Ns,
@@ -22,16 +22,17 @@ def saveLs (dataAn, field_r, field_c, fields_beta, classf, fields_cut, cuts, bin
                         " " + str(N1.mean()) + "\n")
             file.close ()
 
-from GZDataAnalyser import *
+from data_analysers.BiasAnalyser import *
+
 field_r = "petroRad_r_kpc"
 field_c = "absPetroMag_r"
 fields_beta = ["z", "corrMag_r", "petroRad_r_psf"]
 classf = "class_SVM"
-classf = sys.argv[3]
+classf = sys.argv[2]
 N = -1843
 N = 50000
 
-dataAn = GZDataAnalyser (sys.argv[2])
+dataAn = BiasAnalyser (sys.argv[1])
 
 print "E = ", (dataAn.tbdata.field(classf) == 1).sum()
 print "S = ", (dataAn.tbdata.field(classf) == 2).sum()
