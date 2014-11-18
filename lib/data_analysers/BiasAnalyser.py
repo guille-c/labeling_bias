@@ -161,38 +161,45 @@ class BiasAnalyser ():
                    bins = (5,5), nx = 20, fractions = False, equalN = True, 
                    minElementsBin = 100):
         tbdata = self.tbdata
-        #print field_plot, tbdata.field(field_plot)[crit].min(), tbdata.field(field_plot)[crit].max()
+
+        # create array of indices for the data
         if np.isscalar (crit):
             crit = np.arange(len(tbdata.field(field_r)))
         Ls = np.zeros (bins)
         Ns = np.zeros (bins, dtype = int)
+
+        # Check if there is enough data for minElementsBin objects per
+        # bin
         if (len (tbdata.field(field_r)[crit]) < bins[0] * bins[1] * nx * minElementsBin):
             print "not enough data", (Ls + 1).sum()
             print " ", len (tbdata.field(field_r)[crit]), " < ", bins[0] * bins[1] * nx * minElementsBin
             return Ls + 1, np.zeros (bins), np.zeros (bins), Ns
 
+        # split tbdata into bins[0] vectors sorted in terms of field_r
         i_r = self.getEqualNumberSplit (tbdata.field(field_r)[crit], bins[0])
     
+        # equalN = True: same number of objs. per bin.
         if equalN:
             bins_r_mean = np.zeros (bins)
             bins_c_mean = np.zeros (bins)
         else:
             bins_r_mean = []
             bins_c_mean = []
+            #calculate means on bins of field_r 
             for i in range(bins[0]):
                 bins_r_mean.append(tbdata.field(field_r)[crit][i_r[i]].mean())
     
-        fieldBins = False
-        iBins = self.getEqualNumberSplit (tbdata.field(field_c), bins[1])
-        fieldBins = []
-        for i in range(bins[1]):
-            fieldBins.append (tbdata.field(field_c)[iBins[i]].min())
-            if not equalN:
+        if not equalN:
+            iBins = self.getEqualNumberSplit (tbdata.field(field_c), bins[1])
+            fieldBins = []
+            for i in range(bins[1]):
+                fieldBins.append (tbdata.field(field_c)[iBins[i]].min())
                 bins_c_mean.append(tbdata.field(field_c)[iBins[i]].mean())
-        fieldBins.append(tbdata.field(field_c)[iBins[-1]].max())
+            fieldBins.append(tbdata.field(field_c)[iBins[-1]].max())
     
         for i in range(bins[0]):
             if equalN:
+                # get bins in i_r[i] with equal number of objs in field_c
                 i_c = self.getEqualNumberSplit (tbdata.field(field_c)[crit][i_r[i]], bins[1])
             else:
                 i_c = []
@@ -202,21 +209,26 @@ class BiasAnalyser ():
                     i_c.append(np.arange(len(tbdata.field(field_c)[crit][i_r[i]]))[crit1])
     
             for j in range(bins[1]):
-                f21 = np.round(fieldBins[j], 1)
-                f22 = np.round(fieldBins[j+1], 1)
+                # f21 = np.round(fieldBins[j], 1)
+                # f22 = np.round(fieldBins[j+1], 1) Not used?
     
                 Ns[i][j] = len(tbdata.field(field_plot)[crit][i_r[i]][i_c[j]])
+                # calculate mean field_r and field_c values
                 if equalN:
                     bins_r_mean [i][j] = (tbdata.field(field_r)[crit][i_r[i]][i_c[j]]).mean()
                     bins_c_mean [i][j] = (tbdata.field(field_c)[crit][i_r[i]][i_c[j]]).mean()
                 if fractions:
+                    # if number of objects per bins < minElementsBin, L = -0.00001
                     if len(tbdata.field(field_plot)[crit][i_r[i]][i_c[j]]) < minElementsBin / nx:
                         Ls[i][j] = -0.00001
                         continue
                     crit1 = np.arange(len(tbdata.field(field_plot)))[crit][i_r[i]][i_c[j]]
+                    # fractions = E/(E+S)
+                    # fs = means of field_plot per bin, rs = fractions of S
                     fs, Es, rs = self.getFractions (field_plot, classf,nx, 
                                                     ini_crit = crit1, stars = False)
                 else:
+                    # rs = S/E 
                     fs, rs, i_s, N = get_rs (tbdata.field(field_plot)[crit][i_r[i]][i_c[j]], 
                                              tbdata.field(classf)[crit][i_r[i]][i_c[j]], 
                                              nx, get_is = True, get_N = True)
