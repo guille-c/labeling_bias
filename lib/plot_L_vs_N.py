@@ -34,8 +34,10 @@ parser.add_argument("--bins_obs", default = [2, 5, 10, 20],
                     help = "Bins in intrinsic and observable parameters.")
 parser.add_argument("--out_path", default = "./",
                     help = "Path where to leave results.")
-parser.add_argument("--plot_N_objs",
+parser.add_argument("--plot_N_objs", type = int,
                     help = "N_objs for plot L versus bins")
+parser.add_argument("--plot_N_bins_int",
+                    help = "number of bins to use in the L versus N_objs plot")
 
 args = parser.parse_args()
 
@@ -74,11 +76,16 @@ def plotImage (Ls, bins, N_objs, filename):
     # determine ticks for bins
     
     pl.clf()
+    pl.subplots_adjust(bottom=0.15)
     pl.imshow(Ls.transpose(), interpolation = "nearest")
     pl.gca().invert_yaxis()
     pl.colorbar()
-    pl.xticks (np.arange(len(N_objs)), N_objs, rotation = "90")
+    pl.xticks (np.arange(len(N_objs)), N_objs, rotation = "60")
     pl.yticks (np.arange(bins.shape[0]), y_ticks)
+    pl.xlabel ("number of objects per bin")
+    pl.ylabel ("number of bins in intrinsic and observable parameters:\n" + 
+               r"$N_R \times N_M \times N_{\mathcal{A}_{j,q}}$", 
+               multialignment='center')
     pl.savefig(filename)
 
 plotImage (Ls, bins, N_objs, "L_vs_N")
@@ -89,18 +96,31 @@ for i in range (bins.shape[0]):
     leg = (str(bins[i][0]) + "x" + str(bins[i][1]) + "x" + str(bins[i][2])
            + " = " + str (bins[i].prod()))
 
-    pl.errorbar(N_objs[Ls[:, i]!=0], Ls[:, i][Ls[:, i]!=0], 
-                yerr = Ls_std[:, i][Ls[:, i]!=0], label = leg)
+    if args.plot_N_bins_int:
+        crit = tt
+        pl.errorbar(N_objs[Ls[:, i]!=0], Ls[:, i][Ls[:, i]!=0], 
+                    yerr = Ls_std[:, i][Ls[:, i]!=0], label = leg)
+    else:
+        pl.errorbar(N_objs[Ls[:, i]!=0], Ls[:, i][Ls[:, i]!=0], 
+                    yerr = Ls_std[:, i][Ls[:, i]!=0], label = leg)
 pl.xscale("log")
+pl.xlabel ("number of objects per bin")
+pl.ylabel (r"$L$")
 pl.legend()
 pl.savefig ("L_vs_N_objs")
 
 # plotting L versus bins for "plot_N_objs"
 if args.plot_N_objs:
+    Ls_plot = Ls[N_objs == args.plot_N_objs][0]
+    Ls_s_plot = Ls_std[N_objs == args.plot_N_objs][0]
     pl.clf ()
-    pl.errorbar(np.arange(Ls.shape[1]), Ls[N_objs == args.plot_N_objs], 
-                yerr = Ls_std[N_objs == args.plot_N_objs])
+    pl.errorbar(np.arange(Ls.shape[1])[Ls_plot != 0], Ls_plot[Ls_plot != 0], 
+                yerr = Ls_s_plot[Ls_plot != 0], fmt = "x")
     pl.xticks (np.arange(bins.shape[0]), y_ticks, rotation = "60", size = "small")
-    pl.subplots_adjust(bottom=0.25)
+    pl.subplots_adjust(bottom=0.3)
     pl.margins(0.05)
+    pl.xlabel ("number of bins in intrinsic and observable parameters:\n" + 
+               r"$N_R \times N_M \times N_{\mathcal{A}_{j,q}}$", 
+               multialignment='center')
+    pl.ylabel (r"$L$")
     pl.savefig ("L_vs_bins_" + str(args.plot_N_objs))
