@@ -36,7 +36,7 @@ parser.add_argument("--out_path", default = "./",
                     help = "Path where to leave results.")
 parser.add_argument("--plot_N_objs", type = int,
                     help = "N_objs for plot L versus bins")
-parser.add_argument("--plot_N_bins_int",
+parser.add_argument("--plot_N_bins_int", type = np.mat,
                     help = "number of bins to use in the L versus N_objs plot")
 
 args = parser.parse_args()
@@ -92,15 +92,21 @@ plotImage (Ls, bins, N_objs, "L_vs_N")
 plotImage (Ls_std, bins, N_objs, "L_vs_N_std")
 
 pl.clf()
+
+if not np.isscalar(args.plot_N_bins_int):
+    sel_bins = np.array(args.plot_N_bins_int, dtype = int)[0]
+    crit = ((bins[:, 0:2] == sel_bins).prod(axis = 1))
+else:
+    crit = np.ones(bins.shape[0])
+
 for i in range (bins.shape[0]):
     leg = (str(bins[i][0]) + "x" + str(bins[i][1]) + "x" + str(bins[i][2])
            + " = " + str (bins[i].prod()))
 
-    if args.plot_N_bins_int:
-        crit = tt
-        pl.errorbar(N_objs[Ls[:, i]!=0], Ls[:, i][Ls[:, i]!=0], 
-                    yerr = Ls_std[:, i][Ls[:, i]!=0], label = leg)
-    else:
+    #     pl.errorbar(N_objs[Ls[:, i]!=0], Ls[:, i][Ls[:, i]!=0], 
+    #                 yerr = Ls_std[:, i][Ls[:, i]!=0], label = leg)
+    # else:
+    if crit[i]:
         pl.errorbar(N_objs[Ls[:, i]!=0], Ls[:, i][Ls[:, i]!=0], 
                     yerr = Ls_std[:, i][Ls[:, i]!=0], label = leg)
 pl.xscale("log")
