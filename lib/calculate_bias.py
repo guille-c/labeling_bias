@@ -43,71 +43,59 @@ parser.add_argument("--pbb_threshold",
 
 args = parser.parse_args()
 
+# Number of objects for calculating bias.
 N = args.number_objects
+
+# Intrinsic parameters. Currently accept exactly two.
 field_r = args.int_pars[0]
 field_c = args.int_pars[1]
-fields_beta = args.obs_pars
-classf = args.label_name
-analyser = "fit"
-print analyser, " analyser"
+
+fields_beta = args.obs_pars   # Observable parameters. As many as
+                              # needed.
+classf = args.label_name      # Label or probability column name.
 
 dataAn = BiasAnalyser ()
-bins = np.array([10, 10])
-nx = 10
-N_iter = 10
-minElementsBin = 5
+
+bins_int = np.array([10, 10]) # Number of bins for intrinsic pars.
+bins_obs = 10                 # Number of bins for observable pars.
+N_iter = 10                   # Number of iterations for mean and std.
+minElementsBin = 5            # Min. number of objs. per bin.
 np.random.seed (0)
-if analyser == "fits":
-    print "FitsBiasAnalyser"
-    dataAn = FitsBiasAnalyser (args.table_file)
 
-    print "E = ", (dataAn.tbdata.field(classf) == 1).sum()
-    print "S = ", (dataAn.tbdata.field(classf) == 2).sum()
-    print "Total = ", ((dataAn.tbdata.field(classf) == 1).sum() + 
-                       (dataAn.tbdata.field(classf) == 2).sum())
+tbdata = pf.open(args.table_file)[1].data # Open fits table file.
 
-    fields_cut = []
-    cuts = []
-    N_calc = 5
-    #saveLs (dataAn, field_r, field_c, fields_beta, classf, fields_cut, cuts, np.array ([[10, 10, 10]]), [50],
-    #    minElementsBin, N_calc, "./", txt = "")
+# i_s is used to randomize the data.
+i_s = np.arange (len(tbdata))
+np.random.shuffle(i_s)
+tbdata = tbdata[i_s[:N]]
 
-    Ls = np.zeros (N_iter)
-    for i in range (N_iter):
-        L, N = dataAn.L (field_r, field_c, fields_beta, classf, 
-                         bins = bins, nx = nx, N = N, minElementsBin = minElementsBin)
-        print i, "------"
-        print "L = ", L
-        print "N per bin = ", 1. *N / (nx * bins[0] * bins[1])
-        print "N = ", N
-        Ls[i] = L
-        exit()
-else:
-    print "BiasAnalyser"
-    tbdata = pf.open(args.table_file)[1].data
-    i_s = np.arange (len(tbdata))
-    np.random.shuffle(i_s)
-    tbdata = tbdata[i_s[:N]]
-    intrinsic = np.array([tbdata.field (field_r),
-                          tbdata.field (field_c)]).transpose()
-    observables = []
-    for obs in fields_beta:
-        observables.append (tbdata.field (obs))
-    observables = np.array(observables).transpose()
-    y = tbdata.field (classf)
-    labels = np.unique(y)
+# Get intrinsic paraeters.
+intrinsic = np.array([tbdata.field (field_r),
+                      tbdata.field (field_c)]).transpose()
 
-    dataAn = BiasAnalyser ()
+# Get observable parameters.
+observables = []
+for obs in fields_beta:
+    observables.append (tbdata.field (obs))
+observables = np.array(observables).transpose()
 
-    Ls = np.zeros (N_iter)
-    for i in range (N_iter):
-        L, N = dataAn.L (intrinsic, observables, y, labels, bins, nx, 
-                         minElementsBin, N, [True, True, False])
-        print i, "------"
-        print "L = ", L
-        print "N per bin = ", 1. *N / (nx * bins[0] * bins[1])
-        print "N = ", N
-        Ls[i] = L
-        exit()
+# Get labels / probabilities column.
+y = tbdata.field (classf)
+labels = np.unique(y)
+
+dataAn = BiasAnalyser ()
+
+Ls = np.zeros (N_iter)
+for i in range (N_iter):
+    # Calculate L for iteration i.
+    L, N = dataAn.L (intrinsic, observables, y, labels, bins_int,
+                     bins_obs, minElementsBin, N, [True, True, False])
+    print i, "------"
+    print "L = ", L
+    print "N per bin = ", 1. *N / (bins_obs * bins_int.prod())
+    print "N = ", N
+    Ls[i] = L
+    exit()
+
 print "-------"
 print "L = ", Ls.mean(), " +- ", Ls.std()
