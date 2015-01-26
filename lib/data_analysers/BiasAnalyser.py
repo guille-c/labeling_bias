@@ -159,7 +159,7 @@ class BiasAnalyser ():
 
         # define a criteria for choosing objects with labels in
         # "labels"
-        crit = np.where(np.in1d (y, labels))
+        crit = np.where(np.in1d (y, labels))[0]
 
         if N > 0 and N < len(crit):
             i_s = np.arange (len(crit))
