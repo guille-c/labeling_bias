@@ -188,3 +188,15 @@ class BiasAnalyser ():
                 return 0., 0
             L += (Ls**2).sum()
         return np.sqrt(L/(bins_in.prod() * Npl)), N
+
+    def getRandomL (self, intrinsic, observables, y, labels, N_calc,
+                    bins_in = (5,5), bins_ob = 20, minElementsBin = 10, 
+                    N = -1, increasing_bias = True):
+        Ls = np.zeros(N_calc)
+        Ns = np.zeros(N_calc) 
+        
+        for i in range(N_calc):
+            Ls[i], Ns[i] = self.L (intrinsic, observables, y, labels, 
+                                   bins_in, bins_ob, minElementsBin, 
+                                   N, increasing_bias)
+        return Ls, Ns
