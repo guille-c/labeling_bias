@@ -8,15 +8,16 @@ import numpy as np
 import pylab as pl
 import argparse
 from data_analysers.BiasAnalyser import *
-from bias_methods import *    
+import bias_methods as bm   
 
 parser = argparse.ArgumentParser(description='Calculate labeling bias of a data-set.')
 
 parser.add_argument("table_file",
                     help = "table with variables and labels.")
-parser.add_argument("label_name", help = "name of the column containing the labels.")
+parser.add_argument("label_name", nargs = "+",
+                    help = "name of the column containing the labels.")
 parser.add_argument("--number_objects", metavar = "N", 
-                    default = [10, 20, 50], type = np.mat,
+                    default = [10, 20, 50], type = np.array,
                     help = "number of objects per bin to be used for calculating the bias.")
 parser.add_argument("--int_pars", default = ["petroRad_r_kpc","absPetroMag_r"], 
                     nargs = 2,
@@ -26,9 +27,9 @@ parser.add_argument("--obs_pars", default = ["z", "corrMag_r", "petroRad_r_psf"]
 parser.add_argument("--N_iter", default = 5, type = int,
                     help = "Number of calculations of L to calculate means and standard deviations.")
 parser.add_argument("--bins_int", default = [[2, 2], [5, 5], [10, 10], 
-                                         [15, 15], [20, 20]],
+                                             [15, 15], [20, 20]],
                     type = np.mat,
-                    help = "Bins in intrinsic and observable parameters.")
+                    help = "Bins in intrinsic and observable parameters 'b11 b12;b21 b22.")
 parser.add_argument("--bins_obs", default = [2, 5, 10, 20],
                     type = np.mat,
                     help = "Bins in intrinsic and observable parameters.")
@@ -38,14 +39,22 @@ parser.add_argument("--plot_N_objs", type = int,
                     help = "N_objs for plot L versus bins")
 parser.add_argument("--plot_N_bins_int", type = np.mat,
                     help = "number of bins to use in the L versus N_objs plot")
+parser.add_argument("--pbb_thresholds", nargs = "+",
+                    help = "Threshold on the probabilities")
+parser.add_argument("--no_zeros", action='store_const', const = True,
+                    help = "Do not consider labels that don't match the pbb. thresholds")
 
 args = parser.parse_args()
 
 field_int = args.int_pars
 fields_obs = args.obs_pars
 classf = args.label_name
+if args.pbb_thresholds:
+    pbb_thresholds = np.array (args.pbb_thresholds).astype(np.float)
+else:
+    pbb_thresholds = args.pbb_thresholds
 N_iter = args.N_iter
-N_objs = np.array(args.number_objects, dtype = int)[0]
+N_objs = np.array(args.number_objects, dtype = int)
 bins_int = np.array(args.bins_int, dtype = int)
 bins_obs = np.array(args.bins_obs, dtype = int)
 out_path = args.out_path
@@ -55,16 +64,48 @@ for i in range (bins_int.shape[0]):
         #bins[i*len(bins_obs) + j][:] = [bins_int[i][0], bins_int[i][1], bins_obs[j]]
         bins[i + j * bins_int.shape[0]][:] = [bins_int[i][0], bins_int[i][1], bins_obs[j]]
 
+# Intrinsic parameters. Currently accept exactly two.
+field_r = args.int_pars[0]
+field_c = args.int_pars[1]
+
 print bins
 
-dataAn = BiasAnalyser (args.table_file)
+dataAn = BiasAnalyser ()
 
-fields_cut = []
-cuts = []
+tbdata = pf.open(args.table_file)[1].data # Open fits table file.
+N_tot = len(tbdata)
+
+# i_s is used to randomize the data.
+i_s = np.arange (N_tot)
+np.random.shuffle(i_s)
+tbdata = tbdata[i_s]
+
+y = bm.createLabels (tbdata, classf, pbb_thresholds)
+
+crit_zeros = np.ones (len(y), dtype = bool)
+if args.no_zeros:
+    crit_zeros = (y != 0)
+y = y[crit_zeros]
+
+# Get intrinsic paraeters.
+intrinsic = np.array([tbdata.field (field_r)[crit_zeros],
+                      tbdata.field (field_c)[crit_zeros]]).transpose()
+
+# Get observable parameters.
+observables = []
+for obs in fields_obs:
+    observables.append (tbdata.field (obs)[crit_zeros])
+observables = np.array(observables).transpose()
+
+labels = np.unique(y)
 
 # Calculate L versus N and save in files
-Ls, Ls_std = saveLs (dataAn, field_int[0], field_int[1], fields_obs, classf, 
-                     fields_cut, cuts, bins, N_objs, N_iter, out_path)
+# Ls, Ls_std = bm.saveLs (dataAn, field_int[0], field_int[1], fields_obs, classf, 
+#                         fields_cut, cuts, bins, N_objs, N_iter, out_path)
+print "N_objs = ", N_objs
+Ls, Ls_std = bm.saveLs (dataAn, intrinsic, observables, y, labels, bins,
+                        N_objs, N_iter, increasing_bias = [True, True, False],
+                        out_path= out_path)
 
 print Ls
 
