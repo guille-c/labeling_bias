@@ -1,4 +1,3 @@
-
 import sys
 import pylab as pl
 import pyfits as pf
@@ -15,7 +14,10 @@ class BiasAnalyser ():
     def getFractions (self, x, classes, labels, nx, ini_crit = True,
                       get_is = False, get_N = False, equalBins = False):
 
-        crit = np.where(np.in1d (classes, labels))[0][ini_crit]
+        if np.isscalar (ini_crit):
+            crit = np.where(np.in1d (classes, labels))
+        else:
+            crit = np.where(np.in1d (classes, labels))[ini_crit]
 
         x = x[crit]
         classes = classes[crit]
@@ -75,6 +77,43 @@ class BiasAnalyser ():
         ret = np.array(ret)
         return ret
 
+    def KDTree (self, x, pow_n, i_array, i_var = 0, i_ret = 0):
+        if pow_n == 0:
+            return np.zeros(len(i_array)) + i_ret
+        sep = np.median(x[:, i_var])
+        # print sep
+        crit_left = np.arange(len(x))[x[:, i_var] < sep]
+        crit_right = np.arange(len(x))[x[:, i_var] >= sep]
+    
+        left = self.KDTree (x[crit_left], pow_n - 1, crit_left, 
+                             (i_var + 1)%x.shape[1], i_ret)
+        right = self.KDTree (x[crit_right], pow_n - 1, crit_right, 
+                              (i_var + 1)%x.shape[1], i_ret + 2**(pow_n-1))
+        ret = np.zeros(x.shape[0])
+        ret[crit_left] = left
+        ret[crit_right] = right
+        return ret
+        
+    def calculateSigma2 (self, intrinsic, observable, y, labels, 
+                         log2_bins_int, bins_obs, increasing_bias):
+        kd_tree = self.KDTree (intrinsic, log2_bins_int, 
+                               np.arange(intrinsic.shape[0]))
+        kd_keys = np.unique(kd_tree)
+        sigma2 = np.zeros((observable.shape[1], len(labels), 2**log2_bins_int))
+        
+        for j in range (observable.shape[1]):
+            for q in kd_keys:
+                i_bin_int = (kd_tree == q)
+                # rs.shape = (bins_obs, len(labels))
+                fs, rs = self.getFractions (observable[:, j][i_bin_int], 
+                                            y[i_bin_int], labels, bins_obs)
+                for k in range (len(labels)):
+                    if increasing_bias[j]:
+                        sigma2 [j, k, q] = ((rs[:, k] - rs[0, k])**2).sum()/bins_obs
+                    else:
+                        sigma2 [j, k, q] = ((rs[:, k] - rs[-1, k])**2).sum()/bins_obs
+        return sigma2
+
     def getLsBins (self, intrinsic, observable, y, labels, crit = True,
                    bins_in = (5,5), bins_ob = 20, equalN = True, 
                    minElementsBin = 100, increasing_bias = True):
@@ -90,8 +129,8 @@ class BiasAnalyser ():
         # bin
         N_data = intrinsic[crit].shape[0]
         N_objs_per_bin = bins_in.prod() * bins_ob * minElementsBin
-        if ( N_data < N_objs_per_bin):
-            print "not enough data", (Ls + 1).sum()
+        if (N_data < N_objs_per_bin):
+            print "BiasAnalyser.getLsBins: not enough data", (Ls + 1).sum()
             print " ", N_data, " < ", N_objs_per_bin
             return Ls + 1, np.zeros (bins_in), np.zeros (bins_in), Ns
 
@@ -153,25 +192,37 @@ class BiasAnalyser ():
                 Ls [i][j] = L_ij / len(labels)
         return Ls, bins_r_mean, bins_c_mean, Ns
 
-    def L (self, intrinsic, observables, y, labels, 
-           bins_in = (5,5), bins_ob = 20, minElementsBin = 10, 
-           N = -1, increasing_bias = True):
+    def L (self, intrinsic, observables, y, labels, increasing_bias, 
+           log2_bins_int, bins_ob = 20, minElementsBin = 10, N = -1):
 
         # define a criteria for choosing objects with labels in
         # "labels"
         crit = np.where(np.in1d (y, labels))[0]
 
+        if N > len(crit):
+            print "N > len(crit)", N, len(crit)
+            return 0., 0.
+
         if N > 0 and N < len(crit):
             i_s = np.arange (len(crit))
             np.random.shuffle(i_s)
-            crit = crit[i_s[:N]] # N shuffled indices of class == 1
-                                 # and class == 2 objects
+            crit = crit[i_s[:N]] # N shuffled indices of class in
+                                 # "labels"
 
         N = len(crit)
 
+        N_bins = 2**log2_bins_int*bins_ob
+        if N < N_bins*minElementsBin:
+            print "N < N_bins*minElementsBin", N, N_bins*minElementsBin
+            return 0., 0.
+
         Npl = observables.shape[1]
         L = 0
-        print observables.shape
+        sigma2 = self.calculateSigma2 (intrinsic[crit], observables[crit], y[crit], 
+                                       labels, log2_bins_int, bins_ob, 
+                                       increasing_bias)
+
+        return np.sqrt(sigma2.sum()/ (np.prod(sigma2.shape))), N
         for k in range (Npl):
             print k
             observable = observables[:, k]
@@ -189,14 +240,17 @@ class BiasAnalyser ():
             L += (Ls**2).sum()
         return np.sqrt(L/(bins_in.prod() * Npl)), N
 
-    def getRandomL (self, intrinsic, observables, y, labels, N_calc,
-                    bins_in = (5,5), bins_ob = 20, minElementsBin = 10, 
-                    N = -1, increasing_bias = True):
+    def getRandomL (self, intrinsic, observables, y, labels, increasing_bias,
+                    N_calc, bins_in, bins_ob = 20, minElementsBin = 10, 
+                    N_objs = -1):
         Ls = np.zeros(N_calc)
         Ns = np.zeros(N_calc) 
         
         for i in range(N_calc):
             Ls[i], Ns[i] = self.L (intrinsic, observables, y, labels, 
-                                   bins_in, bins_ob, minElementsBin, 
-                                   N, increasing_bias)
+                                   increasing_bias, bins_in, bins_ob, 
+                                   minElementsBin, N_objs)
+                                  # (intrinsic, observables, y, labels, 
+                                  #  bins_in, bins_ob, minElementsBin, 
+                                  #  N_objs, increasing_bias)
         return Ls, Ns

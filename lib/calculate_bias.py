@@ -14,17 +14,24 @@ parser.add_argument("table_file",
                     help = "table with variables and labels.")
 parser.add_argument("label_name", nargs = "+",
                     help = "name of the column containing the labels.")
-parser.add_argument("--number_objects", metavar = "N", type = int, default = 50000, 
-                    help = "number of objects to be used for calculating the bias.")
-parser.add_argument("--int_pars", default = ["petroRad_r_kpc","absPetroMag_r"], 
-                    nargs = 2,
+parser.add_argument("--number_objects", metavar = "N", type = int, default = -1, 
+                    help = "number of objects per bin to be used for calculating the bias.")
+parser.add_argument("--int_pars", default = ["petroRad_r_kpc","absPetroMag_r", "z"], 
                     help = "Name of the columns used as intrinsic parameters.")
-parser.add_argument("--obs_pars", default = ["z", "corrMag_r", "petroRad_r_psf"],
+parser.add_argument("--obs_pars", default = ["corrMag_r", "petroRad_r_psf"],
                     help = "Name of the columns used as observable parameters.")
 parser.add_argument("--pbb_thresholds", nargs = "+",
                     help = "Threshold on the probabilities")
 parser.add_argument("--no_zeros", action='store_const', const = True,
                     help = "Do not consider labels that don't match the pbb. thresholds")
+parser.add_argument("--bins_obs", type = int, default = 20,
+                    help = "log2 bins in intrinsic parameters.")
+parser.add_argument("--log2_bins_int", type = int, default = 7,
+                    help = "Bins in observable parameters.")
+parser.add_argument("--N_iter", default = 5, type = int,
+                    help = "Number of calculations of L to calculate means and standard deviations.")
+parser.add_argument("--labels", nargs = "+",
+                    help = "Labels to be used.")
 
 args = parser.parse_args()
 
@@ -37,18 +44,24 @@ field_c = args.int_pars[1]
 
 fields_beta = args.obs_pars   # Observable parameters. As many as
                               # needed.
+if args.pbb_thresholds:
+    pbb_thresholds = np.array (args.pbb_thresholds).astype(np.float)
+else:
+    pbb_thresholds = args.pbb_thresholds
 classf = args.label_name      # Label or probability column name.
 if args.pbb_thresholds:
     pbb_thresholds = np.array (args.pbb_thresholds).astype(np.float)
 else:
     pbb_thresholds = args.pbb_thresholds
 
+N_calc = args.N_iter
+
 dataAn = BiasAnalyser ()
 
-bins_int = np.array([10, 10]) # Number of bins for intrinsic pars.
-bins_obs = 10                 # Number of bins for observable pars.
-N_iter = 10                   # Number of iterations for mean and std.
-minElementsBin = 5            # Min. number of objs. per bin.
+l2_bins_int = args.log2_bins_int # Number of bins for intrinsic pars.
+bins_obs = args.bins_obs         # Number of bins for observable pars.
+N_iter = args.N_iter             # Number of iterations for mean and std.
+minElementsBin = 5               # Min. number of objs. per bin.
 np.random.seed (0)
 
 tbdata = pf.open(args.table_file)[1].data # Open fits table file.
@@ -76,16 +89,23 @@ for obs in fields_beta:
     observables.append (tbdata.field (obs)[crit_zeros])
 observables = np.array(observables).transpose()
 
-labels = np.unique(y)
+if args.labels:
+    labels = np.array(args.labels, dtype = int)
+else:
+    labels = np.unique(y)
 print "labels = ", labels
-print (y == labels[0]).sum()
-print (y == labels[1]).sum()
 
 dataAn = BiasAnalyser ()
 
-Ls, Ns = dataAn.getRandomL (intrinsic, observables, y, labels, N_iter, bins_int,
-                            bins_obs, minElementsBin, N_objs, 
-                            [True, True, False])
+# Ls, Ns = dataAn.getRandomL (intrinsic, observables, y, labels, N_iter, bins_int,
+#                             bins_obs, minElementsBin, N_objs, 
+#                             [True, True, False])
+increasing_bias = [True, False]
+print N_objs, l2_bins_int, bins_obs
+Ls, Ns = dataAn.getRandomL (intrinsic, observables, y, labels, 
+                            increasing_bias, N_calc, l2_bins_int,
+                            bins_obs, minElementsBin = N_objs, 
+                            N_objs = N_objs*2**l2_bins_int*bins_obs)
 
 print "-------"
 print "L = ", Ls.mean(), " +- ", Ls.std()
