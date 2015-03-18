@@ -79,9 +79,11 @@ if args.no_zeros:
     crit_zeros = (y != 0)
 y = y[crit_zeros]
 
-# Get intrinsic paraeters.
-intrinsic = np.array([tbdata.field (field_r)[crit_zeros],
-                      tbdata.field (field_c)[crit_zeros]]).transpose()
+# Get intrinsic parameters.
+intrinsic = []
+for intr in fields_int:
+    intrinsic.append (tbdata.field (intr)[crit_zeros])
+intrinsic = np.array(intrinsic).transpose()
 
 # Get observable parameters.
 observables = []

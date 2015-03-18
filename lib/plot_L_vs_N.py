@@ -49,7 +49,7 @@ parser.add_argument("--no_zeros", action='store_const', const = True,
 
 args = parser.parse_args()
 
-field_int = args.int_pars
+fields_int = args.int_pars
 fields_obs = args.obs_pars
 classf = args.label_name
 if args.pbb_thresholds:
@@ -97,9 +97,13 @@ y = y[crit_zeros]
 
 print "Number of objects = ", y.shape
 
-# Get intrinsic paraeters.
-intrinsic = np.array([tbdata.field (field_r)[crit_zeros],
-                      tbdata.field (field_c)[crit_zeros]]).transpose()
+# Get intrinsic parameters.
+# intrinsic = np.array([tbdata.field (field_r)[crit_zeros],
+#                       tbdata.field (field_c)[crit_zeros]]).transpose()
+intrinsic = []
+for intr in fields_int:
+    intrinsic.append (tbdata.field (intr)[crit_zeros])
+intrinsic = np.array(intrinsic).transpose()
 
 # Get observable parameters.
 observables = []
@@ -118,7 +122,7 @@ else:
 print "N_objs = ", N_objs
 Ls, Ls_std = bm.saveLs (dataAn, intrinsic, observables, y, labels, bins,
                         N_objs, N_iter, increasing_bias = [True, False],
-                        out_path= out_path)
+                        out_path = out_path)
 
 print Ls
 
@@ -180,9 +184,9 @@ for i in range (bins.shape[0]):
                     yerr = Ls_std[:, i][Ls[:, i]!=0], fmt = None, ecolor = color)
 ax.set_xlabel ("number of objects per bin")
 ax.set_ylabel (r"$L$")
-#ax.set_margins(0.2)
-ax.set_xscale("log")
-ax.set_ylim ([0.29, 0.55])
+pl.margins(0.1)
+#ax.set_xscale("log")
+#ax.set_ylim ([0.29, 0.55])
 
 # Shrink current axis by 20%
 box = ax.get_position()
