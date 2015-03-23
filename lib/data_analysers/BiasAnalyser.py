@@ -77,27 +77,67 @@ class BiasAnalyser ():
         ret = np.array(ret)
         return ret
 
-    def KDTree (self, x, pow_n, i_array, i_var = 0, i_ret = 0):
+    def KDTree (self, x, pow_n, i_array, i_var = 0, i_ret = 0, 
+                crit = "iterative", y = None, labels = None):
         if pow_n == 0:
             return np.zeros(len(i_array)) + i_ret
-        sep = np.median(x[:, i_var])
-        # print sep
-        crit_left = np.arange(len(x))[x[:, i_var] < sep]
-        crit_right = np.arange(len(x))[x[:, i_var] >= sep]
-    
+            
+        if crit == "iterative":
+            this_i_var = i_var
+            sep = np.median(x[:, i_var])
+            # print sep
+        elif crit == "highest_fraction_diference":
+            if y is None or labels is None:
+                print "ERROR BiasAnalyser.KDTree: y and labels required for ", crit
+                exit()
+            f_d = np.zeros(x.shape[1])  # Fraction differences
+            seps = np.zeros(x.shape[1]) # Thresholds for each
+                                        # intrinsic variable
+            
+            # calculate splitting fractions
+            for i in range(x.shape[1]):
+                seps[i] = np.median(x[:, i])
+                f_left = 0
+                f_right = 0
+                for k in labels:
+                    f_left  = (1. * (y[x[:, i] < seps[i]] == k).sum() / 
+                               (x[:, i] < seps[i]).sum())
+                    f_right = (1. * (y[x[:, i] >= seps[i]] == k).sum() / 
+                               (x[:, i] >= seps[i]).sum())
+                    f_d[i] += np.abs (f_left - f_right)
+                f_d [i] = f_d [i] / len (labels)
+            this_i_var = np.argmax (f_d)
+            sep = seps [this_i_var]
+            # print " " , i_ret, " KDTree f_d = ", f_d, this_i_var, x.shape, f_d.prod()
+            # if f_d.prod() == 0.:
+            #     i = np.argmin (f_d)
+            #     print seps[i]
+            #     print i, (y[x[:, i] < seps[i]]).sum(), (y[x[:, i] < seps[i]]).sum()
+            #     exit()
+
+        else:
+            print "ERROR BiasAnalyser.KDTree: ", crit, " criteria not implemented."
+            exit()
+
+        crit_left = np.arange(len(x))[x[:, this_i_var] < sep]
+        crit_right = np.arange(len(x))[x[:, this_i_var] >= sep]
+        i_var_new = (this_i_var + 1)%x.shape[1]
+        
         left = self.KDTree (x[crit_left], pow_n - 1, crit_left, 
-                             (i_var + 1)%x.shape[1], i_ret)
+                             i_var_new, i_ret, crit, y, labels)
         right = self.KDTree (x[crit_right], pow_n - 1, crit_right, 
-                              (i_var + 1)%x.shape[1], i_ret + 2**(pow_n-1))
+                             i_var_new, i_ret + 2**(pow_n-1), crit, y, labels)
         ret = np.zeros(x.shape[0])
         ret[crit_left] = left
         ret[crit_right] = right
         return ret
         
     def calculateSigma2 (self, intrinsic, observable, y, labels, 
-                         log2_bins_int, bins_obs, increasing_bias):
+                         log2_bins_int, bins_obs, increasing_bias, 
+                         kd_tree = "iterative"):
         kd_tree = self.KDTree (intrinsic, log2_bins_int, 
-                               np.arange(intrinsic.shape[0]))
+                               np.arange(intrinsic.shape[0]), crit = kd_tree,
+                               y = y, labels = labels)
         kd_keys = np.unique(kd_tree)
         sigma2 = np.zeros((observable.shape[1], len(labels), 2**log2_bins_int))
         
@@ -193,7 +233,8 @@ class BiasAnalyser ():
         return Ls, bins_r_mean, bins_c_mean, Ns
 
     def L (self, intrinsic, observables, y, labels, increasing_bias, 
-           log2_bins_int, bins_ob = 20, minElementsBin = 10, N = -1):
+           log2_bins_int, bins_ob = 20, minElementsBin = 10, N = -1, 
+           bootstrap = False, kd_tree = "iterative"):
 
         # define a criteria for choosing objects with labels in
         # "labels"
@@ -206,10 +247,12 @@ class BiasAnalyser ():
         if N > 0 and N < len(crit):
             i_s = np.arange (len(crit))
             np.random.shuffle(i_s)
-            crit = crit[i_s[:N]] # N shuffled indices of class in
-                                 # "labels"
+            crit = crit[i_s[:N]]     # N shuffled indices of class in
+                                     # "labels"
 
         N = len(crit)
+        if bootstrap:
+            crit = np.random.choice (crit, size = N, replace = True)
 
         N_bins = 2**log2_bins_int*bins_ob
         if N < N_bins*minElementsBin:
@@ -220,7 +263,7 @@ class BiasAnalyser ():
         L = 0
         sigma2 = self.calculateSigma2 (intrinsic[crit], observables[crit], y[crit], 
                                        labels, log2_bins_int, bins_ob, 
-                                       increasing_bias)
+                                       increasing_bias, kd_tree = kd_tree)
 
         return np.sqrt(sigma2.sum()/ (np.prod(sigma2.shape))), N
         for k in range (Npl):
@@ -242,14 +285,15 @@ class BiasAnalyser ():
 
     def getRandomL (self, intrinsic, observables, y, labels, increasing_bias,
                     N_calc, bins_in, bins_ob = 20, minElementsBin = 10, 
-                    N_objs = -1):
+                    N_objs = -1, bootstrap = False, kd_tree = "iterative"):
         Ls = np.zeros(N_calc)
-        Ns = np.zeros(N_calc) 
+        Ns = np.zeros(N_calc)
         
         for i in range(N_calc):
             Ls[i], Ns[i] = self.L (intrinsic, observables, y, labels, 
                                    increasing_bias, bins_in, bins_ob, 
-                                   minElementsBin, N_objs)
+                                   minElementsBin, N_objs, bootstrap = bootstrap,
+                                   kd_tree = kd_tree)
                                   # (intrinsic, observables, y, labels, 
                                   #  bins_in, bins_ob, minElementsBin, 
                                   #  N_objs, increasing_bias)

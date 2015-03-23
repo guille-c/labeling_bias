@@ -46,6 +46,8 @@ parser.add_argument("--pbb_thresholds", nargs = "+",
                     help = "Threshold on the probabilities")
 parser.add_argument("--no_zeros", action='store_const', const = True,
                     help = "Do not consider labels that don't match the pbb. thresholds")
+parser.add_argument("--logx", action='store_const', const = True,
+                    help = "Logarithmic scale for the x axis.")
 
 args = parser.parse_args()
 
@@ -68,10 +70,7 @@ for i in range (bins_int.shape[0]):
         #bins[i*len(bins_obs) + j][:] = [bins_int[i][0], bins_int[i][1], bins_obs[j]]
         bins[i + j * bins_int.shape[0]][:] = [bins_int[i], bins_obs[j]]
         #bins[i*len(bins_obs) + j][:] = [bins_int[i], bins_obs[j]]
-
-# Intrinsic parameters. Currently accept exactly two.
-field_r = args.int_pars[0]
-field_c = args.int_pars[1]
+logx = args.logx
 
 print bins
 
@@ -104,6 +103,7 @@ intrinsic = []
 for intr in fields_int:
     intrinsic.append (tbdata.field (intr)[crit_zeros])
 intrinsic = np.array(intrinsic).transpose()
+print intrinsic 
 
 # Get observable parameters.
 observables = []
@@ -166,8 +166,9 @@ else:
 print "crit =", crit
 N_B = np.unique(sel_bins[:,0])
 N_A = np.unique(sel_bins[:,1])
-colors = np.array(["b", "r", "g", "c", "k", "m", "y"])[np.arange(len(N_A))]
-lines = np.array(["-", "--", ":", "-.-"])
+colors = np.array(["b", "r", "g", "c", "k", "m", "y", 
+                   "b", "r", "g", "c", "k", "m", "y"])[np.arange(len(N_A))]
+lines = np.array(["-", "--", ":", "-.", "-.-"])
 pl.clf()
 ax = pl.subplot(111)
 for i in range (bins.shape[0]):
@@ -180,20 +181,22 @@ for i in range (bins.shape[0]):
         print i_B, lines[i_B], color
         ax.plot (N_objs[Ls[:, i]!=0], Ls[:, i][Ls[:, i]!=0], lines[i_B] + color, 
                  label = leg)
-        ax.errorbar((1 - 0.1*i_B)*N_objs[Ls[:, i]!=0], Ls[:, i][Ls[:, i]!=0], 
-                    yerr = Ls_std[:, i][Ls[:, i]!=0], fmt = None, ecolor = color)
+        #ax.errorbar((1 - 0.1*i_B)*N_objs[Ls[:, i]!=0], Ls[:, i][Ls[:, i]!=0], 
+        #            yerr = Ls_std[:, i][Ls[:, i]!=0], fmt = None, ecolor = color)
 ax.set_xlabel ("number of objects per bin")
 ax.set_ylabel (r"$L$")
-pl.margins(0.1)
-#ax.set_xscale("log")
+if logx:
+    ax.set_xscale("log")
+else:
+    pl.margins(0.1)
 #ax.set_ylim ([0.29, 0.55])
 
 # Shrink current axis by 20%
 box = ax.get_position()
-ax.set_position([box.x0, box.y0, box.width * 0.7, box.height])
+ax.set_position([box.x0, box.y0, box.width * 0.65, box.height])
 
 ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-pl.savefig ("L_vs_N_objs.eps")
+pl.savefig ("L_vs_N_objs_" + str(N_iter) + ".eps")
 
 pl.clf()
 for i in range (bins.shape[0]):

@@ -23,7 +23,9 @@ def saveLs (dataAn, intrinsic, observables, y, labels, bins,
                 L1, N1 = dataAn.getRandomL (intrinsic, observables, y, labels, 
                                             increasing_bias, N_calc, bins[i][0],
                                             bins[i][1], minElementsBin = N_objs[j], 
-                                            N_objs = N_objs[j]*2**bins[i][0]*bins[i][1])
+                                            N_objs = N_objs[j]*2**bins[i][0]*bins[i][1],
+                                            bootstrap = True, 
+                                            kd_tree = "highest_fraction_diference")
 
                 print filenameLN, L1
                 file = open (filenameLN, "w")
