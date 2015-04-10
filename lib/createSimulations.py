@@ -1,5 +1,5 @@
 import numpy as np
-import pylab as pl
+#import pylab as pl
 import pyfits as pf
 import argparse
 import os
@@ -28,7 +28,8 @@ out_file = args.out_dir + "Simulations_" + str(args.N_objs_in) + "_" + str(args.
 if out_file == args.in_file:
     print "ERROR: in and out files are the same!"
     exit()
-tbdata = pf.open(args.in_file)[1].data # Open fits table file.
+hdu_in = pf.open(args.in_file)[1]
+tbdata = hdu_in.data # Open fits table file.
 # Remove NANs
 print tbdata.shape
 tbdata = tbdata[~np.isnan(np.asarray(tbdata.tolist())).any(axis=1)]
@@ -40,6 +41,8 @@ if args.N_objs_in > 0:
     i_s = np.arange (len(tbdata))
     np.random.shuffle(i_s)
     tbdata = tbdata[i_s[:args.N_objs_in]]
+    hdu_in.data = tbdata
+    hdu_in.writeto(args.out_dir + "input_" + str(args.N_objs_in) + "_" + str(args.N_objs_out) + ".fits")
 
 if args.N_objs_out < 1:
     N_objs_out = tbdata.data.shape[0]

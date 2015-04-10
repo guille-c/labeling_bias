@@ -43,11 +43,15 @@ def createLabels (tbdata, classf, pbb_thresholds):
             print "ERROR: the number of pbb fields does not match the number of thresholds."
             exit()
         y = np.zeros(N_tot)
-        for i in range(len(classf)):
-            print classf[i], classf, tbdata.field (classf[i]).shape
-            crit = (tbdata.field (classf[i]) > pbb_thresholds[i])
-            print i, crit.shape
-            y[crit] = i + 1
+        if len(classf) == 1:
+            y[tbdata.field (classf[0]) >= pbb_thresholds[0]] = 1
+            y[1 - tbdata.field (classf[0]) > pbb_thresholds[0]] = 2
+        else:
+            for i in range(len(classf)):
+                print classf[i], classf, tbdata.field (classf[i]).shape
+                crit = (tbdata.field (classf[i]) > pbb_thresholds[i])
+                print i, crit.shape
+                y[crit] = i + 1
     else:
         if len(classf) != 1:
             #print "ERROR: classf can only be an array when using --pbb_thresholds."

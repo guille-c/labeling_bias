@@ -9,7 +9,7 @@ import pylab as pl
 import argparse
 from data_analysers.BiasAnalyser import *
 import bias_methods as bm   
-font = {'size'   : 14}
+font = {'size'   : 18}
 pl.rc('font', **font)
 
 parser = argparse.ArgumentParser(description='Calculate labeling bias of a data-set.')
@@ -89,9 +89,13 @@ if args.pbb_thresholds:
 else:
     y = np.array(tbdata.field(classf[0]), dtype = int)
 
+data_aux = tbdata.tolist()
+data_aux = np.asarray(tbdata.tolist())
 crit_zeros = np.ones (len(y), dtype = bool)
 if args.no_zeros:
-    crit_zeros = (y != 0)
+    crit_zeros = (y != 0) & ~np.isnan(data_aux).any(axis = 1)
+else:
+    crit_zeros = ~np.isnan(data_aux).any(axis = 1)
 y = y[crit_zeros]
 
 print "Number of objects = ", y.shape
@@ -149,6 +153,21 @@ def plotImage (Ls, bins, N_objs, filename):
 plotImage (Ls, bins, N_objs, "L_vs_N.eps")
 plotImage (Ls_std, bins, N_objs, "L_vs_N_std.eps")
 
+if args.plot_N_objs:
+    print (Ls[N_objs == args.plot_N_objs]).shape
+    print Ls[N_objs == args.plot_N_objs]
+    Ls_plot = Ls[N_objs == args.plot_N_objs][0].reshape((len(bins_obs), len(bins_int)))
+    pl.clf()
+    pl.subplots_adjust(bottom=0.15)
+    pl.imshow(Ls_plot.transpose(), interpolation = "nearest", vmin = 0.1, vmax = 0.35)
+    pl.gca().invert_yaxis()
+    pl.colorbar()
+    pl.xticks (np.arange(len(bins_obs)), bins_obs, rotation = "60")
+    pl.yticks (np.arange(len(bins_int)), 2**bins_int)
+    pl.xlabel ("number of bins in observables")
+    pl.ylabel ("number of bins in intrinsic", 
+               multialignment='center')
+    pl.savefig("L_vs_bins_2D_" + str(args.plot_N_objs) + ".eps")
 
 if not args.plot_N_bins_int is None:
     print args.plot_N_bins_int
@@ -181,8 +200,8 @@ for i in range (bins.shape[0]):
         print i_B, lines[i_B], color
         ax.plot (N_objs[Ls[:, i]!=0], Ls[:, i][Ls[:, i]!=0], lines[i_B] + color, 
                  label = leg)
-        #ax.errorbar((1 - 0.1*i_B)*N_objs[Ls[:, i]!=0], Ls[:, i][Ls[:, i]!=0], 
-        #            yerr = Ls_std[:, i][Ls[:, i]!=0], fmt = None, ecolor = color)
+        ax.errorbar((1 - 0.1*i_B)*N_objs[Ls[:, i]!=0], Ls[:, i][Ls[:, i]!=0], 
+                    yerr = Ls_std[:, i][Ls[:, i]!=0], fmt = None, ecolor = color)
 ax.set_xlabel ("number of objects per bin")
 ax.set_ylabel (r"$L$")
 if logx:
@@ -191,11 +210,15 @@ else:
     pl.margins(0.1)
 #ax.set_ylim ([0.29, 0.55])
 
-# Shrink current axis by 20%
-box = ax.get_position()
-ax.set_position([box.x0, box.y0, box.width * 0.65, box.height])
+if args.logx:
+    # Shrink current axis by 20%
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0, box.width * 0.65, box.height])
 
-ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+    ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+else:
+    ax.legend(loc = "best")
+
 pl.savefig ("L_vs_N_objs_" + str(N_iter) + ".eps")
 
 pl.clf()

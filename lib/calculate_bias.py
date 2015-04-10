@@ -38,16 +38,9 @@ args = parser.parse_args()
 # Number of objects for calculating bias.
 N_objs = args.number_objects
 
-# Intrinsic parameters. Currently accept exactly two.
-field_r = args.int_pars[0]
-field_c = args.int_pars[1]
-
+fields_int = args.int_pars
 fields_beta = args.obs_pars   # Observable parameters. As many as
                               # needed.
-if args.pbb_thresholds:
-    pbb_thresholds = np.array (args.pbb_thresholds).astype(np.float)
-else:
-    pbb_thresholds = args.pbb_thresholds
 classf = args.label_name      # Label or probability column name.
 if args.pbb_thresholds:
     pbb_thresholds = np.array (args.pbb_thresholds).astype(np.float)
@@ -72,16 +65,27 @@ i_s = np.arange (N_tot)
 np.random.shuffle(i_s)
 tbdata = tbdata[i_s]
 
-y = bm.createLabels (tbdata, classf, pbb_thresholds)
+if args.pbb_thresholds:
+    y = bm.createLabels (tbdata, classf, pbb_thresholds)
+else:
+    y = np.array(tbdata.field(classf[0]), dtype = int)
 
-crit_zeros = np.ones (len(y))
+data_aux = tbdata.tolist()
+data_aux = np.asarray(tbdata.tolist())
+crit_zeros = np.ones (len(y), dtype = bool)
+# if args.no_zeros:
+#     crit_zeros = (y != 0)
+# else:
+#     crit_zeros = np.array(np.ones (len(y)), dtype = bool)
 if args.no_zeros:
-    crit_zeros = (y != 0)
+    crit_zeros = (y != 0) & ~np.isnan(data_aux).any(axis = 1)
+else:
+    crit_zeros = ~np.isnan(data_aux).any(axis = 1)
 y = y[crit_zeros]
 
 # Get intrinsic parameters.
 intrinsic = []
-for intr in fields_int:
+for intr in args.int_pars:
     intrinsic.append (tbdata.field (intr)[crit_zeros])
 intrinsic = np.array(intrinsic).transpose()
 
@@ -96,7 +100,11 @@ if args.labels:
 else:
     labels = np.unique(y)
 print "labels = ", labels
-
+tot_lab = 0
+for i in range (len(labels)):
+    print "class ", labels[i], " = ", (y == labels[i]).sum()
+    tot_lab += (y == labels[i]).sum()
+print "Labeled total = ", tot_lab
 dataAn = BiasAnalyser ()
 
 # Ls, Ns = dataAn.getRandomL (intrinsic, observables, y, labels, N_iter, bins_int,
@@ -104,10 +112,14 @@ dataAn = BiasAnalyser ()
 #                             [True, True, False])
 increasing_bias = [True, False]
 print N_objs, l2_bins_int, bins_obs
+print intrinsic.shape, observables.shape, y.shape, labels, increasing_bias, N_calc, l2_bins_int, bins_obs, N_objs, l2_bins_int, bins_obs
+
 Ls, Ns = dataAn.getRandomL (intrinsic, observables, y, labels, 
                             increasing_bias, N_calc, l2_bins_int,
                             bins_obs, minElementsBin = N_objs, 
-                            N_objs = N_objs*2**l2_bins_int*bins_obs)
+                            N_objs = N_objs*2**l2_bins_int*bins_obs,
+                            bootstrap = True, 
+                            kd_tree = "highest_fraction_diference")
 
 print "-------"
 print "L = ", Ls.mean(), " +- ", Ls.std()
