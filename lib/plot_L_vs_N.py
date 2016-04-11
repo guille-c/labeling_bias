@@ -11,6 +11,7 @@ from data_analysers.BiasAnalyser import *
 import bias_methods as bm   
 font = {'size'   : 18}
 pl.rc('font', **font)
+from time import time
 
 parser = argparse.ArgumentParser(description='Calculate labeling bias of a data-set.')
 
@@ -76,19 +77,32 @@ print bins
 
 dataAn = BiasAnalyser ()
 
+print "READING TABLE"
+t1 = time()
 tbdata = pf.open(args.table_file)[1].data # Open fits table file.
+print "TABLE READ IN ", time() - t1
+
 N_tot = len(tbdata)
 
+print "RANDOMIZING"
+t1 = time()
 # i_s is used to randomize the data.
 i_s = np.arange (N_tot)
 np.random.shuffle(i_s)
+print "RANDOMIZED 1 IN ", time() - t1
 tbdata = tbdata[i_s]
+print "RANDOMIZED 2 IN ", time() - t1
 
+print "CREATING LABELS"
+t1 = time()
 if args.pbb_thresholds:
     y = bm.createLabels (tbdata, classf, pbb_thresholds)
 else:
     y = np.array(tbdata.field(classf[0]), dtype = int)
+print "LABELS CREATED IN ", time() - t1
 
+print "CHECKING ZEROS AND NANS"
+t1 = time()
 data_aux = tbdata.tolist()
 data_aux = np.asarray(tbdata.tolist())
 crit_zeros = np.ones (len(y), dtype = bool)
@@ -97,6 +111,7 @@ if args.no_zeros:
 else:
     crit_zeros = ~np.isnan(data_aux).any(axis = 1)
 y = y[crit_zeros]
+print "CHECKED IN ", time() - t1
 
 print "Number of objects = ", y.shape
 
@@ -167,7 +182,7 @@ if args.plot_N_objs:
     pl.xlabel ("number of bins in observables")
     pl.ylabel ("number of bins in intrinsic", 
                multialignment='center')
-    pl.savefig("L_vs_bins_2D_" + str(args.plot_N_objs) + ".eps")
+    pl.savefig("L_vs_bins_2D_" + str(args.plot_N_objs) + "_Niter" + str (N_iter) + ".eps")
 
 if not args.plot_N_bins_int is None:
     print args.plot_N_bins_int
