@@ -4,6 +4,7 @@ import os
 import numpy as np
 import argparse
 import bias_methods as bm
+import pandas as pd
 
 from data_analysers.BiasAnalyser import *
 from data_analysers.FitsBiasAnalyser import *
@@ -72,15 +73,19 @@ else:
 
 data_aux = tbdata.tolist()
 data_aux = np.asarray(tbdata.tolist())
+print data_aux.shape
 crit_zeros = np.ones (len(y), dtype = bool)
 # if args.no_zeros:
 #     crit_zeros = (y != 0)
 # else:
 #     crit_zeros = np.array(np.ones (len(y)), dtype = bool)
 if args.no_zeros:
-    crit_zeros = (y != 0) & ~np.isnan(data_aux).any(axis = 1)
+    print "NULL = ", pd.isnull(data_aux).any(axis = 1).sum()
+    #crit_zeros = (y != 0) & ~np.isnan(data_aux).any(axis = 1)
+    crit_zeros = (y != 0) & ~pd.isnull(data_aux).any(axis = 1)
 else:
-    crit_zeros = ~np.isnan(data_aux).any(axis = 1)
+    #crit_zeros = ~np.isnan(data_aux).any(axis = 1)
+    crit_zeros = ~pd.isnull(data_aux).any(axis = 1)
 y = y[crit_zeros]
 
 # Get intrinsic parameters.
@@ -119,7 +124,7 @@ Ls, Ns = dataAn.getRandomL (intrinsic, observables, y, labels,
                             bins_obs, minElementsBin = N_objs, 
                             N_objs = N_objs*2**l2_bins_int*bins_obs,
                             bootstrap = True, 
-                            kd_tree = "highest_fraction_diference")
+                            kd_tree = "highest_fraction_difference")
 
 print "-------"
 print "L = ", Ls.mean(), " +- ", Ls.std()

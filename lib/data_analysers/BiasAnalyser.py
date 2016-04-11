@@ -86,7 +86,7 @@ class BiasAnalyser ():
             this_i_var = i_var
             sep = np.median(x[:, i_var])
             # print sep
-        elif crit == "highest_fraction_diference":
+        elif crit == "highest_fraction_difference":
             if y is None or labels is None:
                 print "ERROR BiasAnalyser.KDTree: y and labels required for ", crit
                 exit()
@@ -97,9 +97,16 @@ class BiasAnalyser ():
             # calculate splitting fractions
             for i in range(x.shape[1]):
                 seps[i] = np.median(x[:, i])
+                if (x[:, i] < seps[i]).sum() == 0 or (x[:, i] >= seps[i]).sum() == 0:
+                    seps[i] = np.mean(x[:, i])
                 f_left = 0
                 f_right = 0
                 for k in labels:
+                    if len(x) != len(y):
+                        print len(x[:, i] < seps[i]), len(y), len(x)
+                        print (y[x[:, i] < seps[i]] == k).sum()
+                        print (x[:, i] < seps[i]).sum()
+                        exit()
                     f_left  = (1. * (y[x[:, i] < seps[i]] == k).sum() / 
                                (x[:, i] < seps[i]).sum())
                     f_right = (1. * (y[x[:, i] >= seps[i]] == k).sum() / 
@@ -124,9 +131,9 @@ class BiasAnalyser ():
         i_var_new = (this_i_var + 1)%x.shape[1]
         
         left = self.KDTree (x[crit_left], pow_n - 1, crit_left, 
-                             i_var_new, i_ret, crit, y, labels)
+                             i_var_new, i_ret, crit, y[crit_left], labels)
         right = self.KDTree (x[crit_right], pow_n - 1, crit_right, 
-                             i_var_new, i_ret + 2**(pow_n-1), crit, y, labels)
+                             i_var_new, i_ret + 2**(pow_n-1), crit, y[crit_right], labels)
         ret = np.zeros(x.shape[0])
         ret[crit_left] = left
         ret[crit_right] = right
@@ -266,22 +273,6 @@ class BiasAnalyser ():
                                        increasing_bias, kd_tree = kd_tree)
 
         return np.sqrt(sigma2.sum()/ (np.prod(sigma2.shape))), N
-        for k in range (Npl):
-            print k
-            observable = observables[:, k]
-            if np.isscalar(increasing_bias):
-                inc = increasing_bias
-            else:
-                inc = increasing_bias[k]
-            Ls, rs, cs, Ns = self.getLsBins(intrinsic, observable, 
-                                            y, labels, bins_in = bins_in, 
-                                            minElementsBin = minElementsBin,
-                                            bins_ob = bins_ob, 
-                                            crit = crit, increasing_bias = inc)
-            if (Ls.sum() == bins_in.prod()):
-                return 0., 0
-            L += (Ls**2).sum()
-        return np.sqrt(L/(bins_in.prod() * Npl)), N
 
     def getRandomL (self, intrinsic, observables, y, labels, increasing_bias,
                     N_calc, bins_in, bins_ob = 20, minElementsBin = 10, 
