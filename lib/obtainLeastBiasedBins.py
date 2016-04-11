@@ -7,18 +7,21 @@ from data_analysers.BiasAnalyser import *
 import bias_methods as bm   
 
 def calculateDL (dataAn, bins_obs, intrinsic, observables, 
-                 y, labels, increasing_bias, log2_bins_int, N_calc):
+                 y, labels, increasing_bias, log2_bins_int, N_calc,
+                 kd_tree):
     N_bins = 2**log2_bins_int*bins_obs
     L1, N1 = dataAn.getRandomL (intrinsic, observables, y, labels,
                                 increasing_bias, N_calc, 
                                 log2_bins_int, bins_obs,
                                 minElementsBin = 0, 
-                                N_objs = N_labeled, bootstrap = True)
+                                N_objs = N_labeled, bootstrap = True, 
+                                kd_tree = kd_tree)
     L2, N2 = dataAn.getRandomL (intrinsic, observables, y, labels, 
                                 increasing_bias, N_calc, 
                                 log2_bins_int, bins_obs,
                                 minElementsBin = 0, 
-                                N_objs = N_labeled - 10*N_bins, bootstrap = True)
+                                N_objs = N_labeled - 10*N_bins, bootstrap = True,
+                                kd_tree = kd_tree)
     if L1.prod() == 0 or L2.prod() == 0:
         return np.inf, 0
     dL = (L2 - L1)
@@ -29,7 +32,7 @@ def calculateDL (dataAn, bins_obs, intrinsic, observables,
 def searchBestObsBins (dataAn, log_bins_ini, log_bins_end, 
                        dL_ini, dL_end, intrinsic, 
                        observables, y, labels, increasing_bias,
-                       N_calc, tol):
+                       N_calc, tol, obs_binning, kd_tree):
     if (log_bins_end - log_bins_ini) <= 1:
         print "returning"
         return [], [], []
@@ -42,22 +45,17 @@ def searchBestObsBins (dataAn, log_bins_ini, log_bins_end,
         dLm = np.inf
         dLs = 0
     else:
-        # L1, N1 = dataAn.getRandomL (intrinsic, observables, y, labels,
-        #                             increasing_bias, N_calc, 
-        #                             log2_bins_int, current_bins,
-        #                             minElementsBin = 0, 
-        #                             N_objs = N_labeled, bootstrap = True)
-        # L2, N2 = dataAn.getRandomL (intrinsic, observables, y, labels, 
-        #                             increasing_bias, N_calc, 
-        #                             log2_bins_int, current_bins,
-        #                             minElementsBin = 0, 
-        #                             N_objs = N_labeled - 10*N_bins, bootstrap = True)
-        # dL = (L2 - L1)
-        # dLm, dLs = L2.mean() - L1.mean(), dL.std()
-
-        dLm, dLs = calculateDL (dataAn, 2**current_bins, intrinsic, observables, 
-                                y, labels, increasing_bias, current_bins, N_calc)
-
+        if obs_binning == "total_int":
+            bins_obs = 2**current_bins
+        elif obs_binning == "single_int":
+            bins_obs = int(np.round(2**(current_bins/3.)))
+            print "binning = ", current_bins, bins_obs
+        else:
+            print "ERROR: searchBestObsBins ", obs_binning, " binning not implemented."
+            exit()
+        dLm, dLs = calculateDL (dataAn, bins_obs, intrinsic, observables, 
+                                y, labels, increasing_bias, current_bins, N_calc,
+                                kd_tree)
         print "dL[", current_bins, "] = ", dLm, dLs, log_bins_ini, log_bins_end, obj_per_bin
         #print L1
 
@@ -67,14 +65,16 @@ def searchBestObsBins (dataAn, log_bins_ini, log_bins_end,
                                                         dL_ini, dLm, intrinsic, 
                                                         observables, 
                                                         y, labels, 
-                                                        increasing_bias, N_calc, tol)
+                                                        increasing_bias, N_calc, tol,
+                                                        obs_binning, kd_tree)
     else:
         ret_dLm, ret_dLs, ret_bins = searchBestObsBins (dataAn, current_bins, 
                                                         log_bins_end,
                                                         dLm, dL_end, 
                                                         intrinsic, observables, 
                                                         y, labels, 
-                                                        increasing_bias, N_calc, tol)
+                                                        increasing_bias, N_calc, tol,
+                                                        obs_binning, kd_tree)
     return [dLm] + ret_dLm, [dLs] + ret_dLs, [current_bins] + ret_bins
     
 parser = argparse.ArgumentParser(description='Obtain least biased obs bin.')
@@ -101,6 +101,8 @@ parser.add_argument("--no_zeros", action='store_const', const = True,
                     help = "Do not consider labels that don't match the pbb. thresholds")
 parser.add_argument("--tol", default = 1E-2, type = float,
                     help = "Tolerance for accepting a bins")
+parser.add_argument ("--obs_binning", default = "total_int", 
+                     help = "Binning strategy for observed parameters.")
 
 args = parser.parse_args()
 
@@ -187,20 +189,42 @@ increasing_bias = [True, False]
 #                       N_objs = N_labeled - 10*N_bins, bootstrap = True)
 # print "L_max = ", Lmax1, Lmax2
 # dL_max = (Lmax1 - Lmax2)
+obs_binning = args.obs_binning
 
-log_bins_min = 1
-dL_min, dLs_min = calculateDL (dataAn, 2**log_bins_min, intrinsic, observables, 
-                               y, labels, increasing_bias, log_bins_min, N_iter)
+log_bins_min = 2
+if obs_binning == "total_int":
+    bins_obs = 2**log_bins_min
+elif obs_binning == "single_int":
+    #bins_obs = int(np.round(2**log_bins_min / 3.))
+    bins_obs = int(np.round(2**(log_bins_min/3.)))
+else:
+    print "ERROR: ", obs_binning, " not implemented"
+    exit()
+dL_min, dLs_min = calculateDL (dataAn, bins_obs, intrinsic, observables, 
+                               y, labels, increasing_bias, log_bins_min, N_iter,
+                               "highest_fraction_difference")
 N_obj_per_bin = 15
-bins_max = np.sqrt(1.*intrinsic.shape[0]/N_obj_per_bin)
-log_bins_max = int ( np.trunc(np.log2 (bins_max)))
-dL_max, dLs_max = calculateDL (dataAn, 2**log_bins_max, intrinsic, observables, 
-                               y, labels, increasing_bias, log_bins_max, N_iter)
+if obs_binning == "total_int":
+    bins_max = np.sqrt(1.*intrinsic.shape[0]/N_obj_per_bin)
+    log_bins_max = int ( np.trunc(np.log2 (bins_max)))
+    bins_obs = 2**log_bins_max
+elif obs_binning == "single_int":
+    bins_max_int = ((1.*intrinsic.shape[0]/N_obj_per_bin)**
+                    (intrinsic.shape[1]/(intrinsic.shape[1] + 1.)))
+    log_bins_max = int (np.trunc(np.log2 (bins_max_int)))
+    #bins_obs = int(np.round(2**log_bins_max / 3.))
+    bins_obs = int(np.round(bins_max_int**(1./intrinsic.shape[1])))
+    print intrinsic.shape[0], bins_max_int, log_bins_max, bins_obs
+
+dL_max, dLs_max = calculateDL (dataAn, bins_obs, intrinsic, observables, 
+                               y, labels, increasing_bias, log_bins_max, N_iter,
+                               "highest_fraction_difference")
 
 dLm, dLs, bins_obs = searchBestObsBins (dataAn, log_bins_min, log_bins_max, 
                                         dL_min, dL_max, 
                                         intrinsic, observables, y, labels, 
-                                        increasing_bias, N_iter, tol)
+                                        increasing_bias, N_iter, tol, obs_binning,
+                                        "highest_fraction_difference")
 
 dLm = [dL_min] + dLm + [dL_max]
 bins_obs = [log_bins_min] + bins_obs + [log_bins_max]
