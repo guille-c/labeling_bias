@@ -5,9 +5,11 @@ import astropy as ap
 import astropy.cosmology as cosmo
 import argparse
 import os
+import pandas as pd
+from bias_methods import *
 
-def processSelection (hdu, i_ini, i_end, field_r, field_m, field_z, field_psf, 
-                      p_class1, biases, out_dir):
+def processSelection (hdu, i_ini, i_end, field_r, field_m, field_z, field_psf,
+                      p_class1, biases, out_dir, class_fields = False, no_zeros = False):
     out_fn = out_dir + "sim_bias_" + str(i_ini) + "_" + str(i_end) + ".fits"
     if os.path.exists (out_fn):
         return
@@ -29,6 +31,24 @@ def processSelection (hdu, i_ini, i_end, field_r, field_m, field_z, field_psf,
     tbdata = tbdata[~rm_crit]
     print tbdata.shape
 
+    if np.isscalar (class_fields):
+        y = (np.random.random(tbdata.shape[0]) < p_class1)
+    else:
+        y = createLabels (tbdata, class_fields, np.zeros (len (class_fields)) + p_class1)
+        data_aux = tbdata.tolist()
+        data_aux = np.asarray(tbdata.tolist())
+        if no_zeros:
+            print "NULL = ", pd.isnull(data_aux).any(axis = 1).sum()
+            #crit_zeros = (y != 0) & ~np.isnan(data_aux).any(axis = 1)
+            crit_zeros = (y != 0) & ~pd.isnull(data_aux).any(axis = 1)
+            y = y - 1
+        else:
+            #crit_zeros = ~np.isnan(data_aux).any(axis = 1)
+            crit_zeros = ~pd.isnull(data_aux).any(axis = 1)
+        del data_aux
+        y = y[crit_zeros]
+        tbdata = tbdata[crit_zeros]
+
     r = tbdata.field(field_r)
     m = tbdata.field(field_m)
 
@@ -39,7 +59,6 @@ def processSelection (hdu, i_ini, i_end, field_r, field_m, field_z, field_psf,
 
     z = tbdata.field(field_z)
     psf = tbdata.field(field_psf)
-    y = (np.random.random(tbdata.shape[0]) < p_class1)
 
     d = cosmo.angular_diameter_distance(z).to(ap.units.kpc) # distance in kpc
     scale = d*ap.units.arcsec.to(ap.units.radian) # scale [kpc/arcsec]
@@ -111,6 +130,10 @@ parser.add_argument ("--biases", default = [0.1], type = float, nargs = "+",
                      help = "Probability of an object of being class 1.")
 parser.add_argument ("--N_max", type = int,
                      help = "Maximum number of objects (rows) to process.")
+parser.add_argument ("--class_fields", nargs = "+",
+                     help = "Probability columns to be used for labeling.")
+parser.add_argument("--no_zeros", action='store_const', const = True,
+                    help = "Do not consider labels that don't match the pbb. thresholds")
 
 args = parser.parse_args()
 
@@ -120,6 +143,7 @@ field_r = "petroRad_r"
 field_m = "corrMag_r"
 field_z = "z"
 field_psf = "psfWidth_r"
+print args.class_fields
 
 hdu_in = pf.open(args.in_file)[1] # Open fits table file.
 #print hdu_in.data.field(field_r).max()
@@ -134,7 +158,7 @@ for i in range (len(iters) - 1):
     print "PROCESSING ", iters[i], iters[i + 1]
     processSelection (hdu_in, iters[i], iters[i + 1], 
                       field_r, field_m, field_z, field_psf, 
-                      args.p1, biases, args.out_dir)
+                      args.p1, biases, args.out_dir, args.class_fields, no_zeros = args.no_zeros)
     #(hdu, i_ini, i_end, field_r, field_m, field_z, field_psf, 
     # p_class1, biases, out_dir)
 fields_names = [field_r, field_m, field_z, field_psf]
