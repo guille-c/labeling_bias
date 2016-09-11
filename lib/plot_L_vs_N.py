@@ -9,8 +9,9 @@ import pylab as pl
 import argparse
 from data_analysers.BiasAnalyser import *
 import bias_methods as bm   
-font = {'size'   : 18}
+font = {'size'   : 16}
 pl.rc('font', **font)
+pl.rc_context(rc={'mathtext.fontset':'stixsans'})
 from time import time
 
 parser = argparse.ArgumentParser(description='Calculate labeling bias of a data-set.')
@@ -22,7 +23,7 @@ parser.add_argument("label_name", nargs = "+",
 parser.add_argument("--labels", nargs = "+",
                     help = "Labels to be used.")
 parser.add_argument("--number_objects", metavar = "N", 
-                    default = [10, 20, 50], nargs = "+", 
+                    default = [10, 20, 50, 100, 150, 200], nargs = "+", 
                     help = "number of objects per bin to be used for calculating the bias.")
 parser.add_argument("--int_pars", default = ["petroRad_r_kpc","absPetroMag_r", "z"], 
                     nargs = "+",
@@ -206,8 +207,11 @@ lines = np.array(["-", "--", ":", "-.", "-.-"])
 pl.clf()
 ax = pl.subplot(111)
 for i in range (bins.shape[0]):
-    leg = (str(2**bins[i][0]) + "x"  + str(bins[i][1])
-           + " = " + str (2**bins[i][0]* bins[i][1]))
+    #leg = (str(2**bins[i][0]) + "x"  + str(bins[i][1])
+    #       + " = " + str (2**bins[i][0]* bins[i][1]))
+    leg = (r"$2^" + str(bins[i][0]) + "\\!\\times "  + str(bins[i][1])
+           + " = " + str (2**bins[i][0]* bins[i][1]) + "$")
+    print "---->>>", leg 
     if crit[i]:
         color = colors[np.where(N_A == bins[i][1])][0]
         print "color = ", color
@@ -215,10 +219,11 @@ for i in range (bins.shape[0]):
         print i_B, lines[i_B], color
         ax.plot (N_objs[Ls[:, i]!=0], Ls[:, i][Ls[:, i]!=0], lines[i_B] + color, 
                  label = leg)
-        ax.errorbar((1 - 0.1*i_B)*N_objs[Ls[:, i]!=0], Ls[:, i][Ls[:, i]!=0], 
+        ax.errorbar(N_objs[Ls[:, i]!=0] - i_B , Ls[:, i][Ls[:, i]!=0], 
                     yerr = Ls_std[:, i][Ls[:, i]!=0], fmt = None, ecolor = color)
 ax.set_xlabel ("number of objects per bin")
 ax.set_ylabel (r"$L$")
+ax.set_ylim ([0.12, 0.55])
 if logx:
     ax.set_xscale("log")
 else:
