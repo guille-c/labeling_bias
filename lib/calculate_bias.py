@@ -56,7 +56,7 @@ l2_bins_int = args.log2_bins_int # Number of bins for intrinsic pars.
 bins_obs = args.bins_obs         # Number of bins for observable pars.
 N_iter = args.N_iter             # Number of iterations for mean and std.
 minElementsBin = 5               # Min. number of objs. per bin.
-np.random.seed (0)
+#np.random.seed (0)
 
 tbdata = pf.open(args.table_file)[1].data # Open fits table file.
 N_tot = len(tbdata)
@@ -124,7 +124,8 @@ Ls, Ns = dataAn.getRandomL (intrinsic, observables, y, labels,
                             bins_obs, minElementsBin = N_objs, 
                             N_objs = N_objs*2**l2_bins_int*bins_obs,
                             bootstrap = True, 
-                            kd_tree = "highest_fraction_difference")
+                            kd_tree = "iterative")
+#                            kd_tree = "highest_fraction_difference")
 
 print "-------"
 print "L = ", Ls.mean(), " +- ", Ls.std()

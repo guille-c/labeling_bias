@@ -134,7 +134,7 @@ class BiasAnalyser ():
                              i_var_new, i_ret, crit, y[crit_left], labels)
         right = self.KDTree (x[crit_right], pow_n - 1, crit_right, 
                              i_var_new, i_ret + 2**(pow_n-1), crit, y[crit_right], labels)
-        ret = np.zeros(x.shape[0])
+        ret = np.zeros(x.shape[0], dtype = "int")
         ret[crit_left] = left
         ret[crit_right] = right
         return ret

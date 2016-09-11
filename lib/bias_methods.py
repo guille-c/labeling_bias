@@ -46,7 +46,8 @@ def saveLs (dataAn, intrinsic, observables, y, labels, bins,
                                             minElementsBin = N_objs[j], 
                                             N_objs = N_objs[j]*2**bins[i][0]*bins[i][1],
                                             bootstrap = True, 
-                                            kd_tree = "highest_fraction_difference")
+                                            kd_tree = "iterative")
+#                                            kd_tree = "highest_fraction_difference")
                 if max_calc > 0:
                     L1 = np.concatenate((calcLs[0], L1))
                     N1 = np.concatenate((calcLs[1], N1))

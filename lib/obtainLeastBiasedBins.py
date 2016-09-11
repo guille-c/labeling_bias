@@ -202,7 +202,8 @@ else:
     exit()
 dL_min, dLs_min = calculateDL (dataAn, bins_obs, intrinsic, observables, 
                                y, labels, increasing_bias, log_bins_min, N_iter,
-                               "highest_fraction_difference")
+                               "iterative")
+#                               "highest_fraction_difference")
 N_obj_per_bin = 15
 if obs_binning == "total_int":
     bins_max = np.sqrt(1.*intrinsic.shape[0]/N_obj_per_bin)
@@ -218,13 +219,15 @@ elif obs_binning == "single_int":
 
 dL_max, dLs_max = calculateDL (dataAn, bins_obs, intrinsic, observables, 
                                y, labels, increasing_bias, log_bins_max, N_iter,
-                               "highest_fraction_difference")
+                               "iterative")
+#                               "highest_fraction_difference")
 
 dLm, dLs, bins_obs = searchBestObsBins (dataAn, log_bins_min, log_bins_max, 
                                         dL_min, dL_max, 
                                         intrinsic, observables, y, labels, 
                                         increasing_bias, N_iter, tol, obs_binning,
-                                        "highest_fraction_difference")
+                                        "iterative")
+#                                        "highest_fraction_difference")
 
 dLm = [dL_min] + dLm + [dL_max]
 bins_obs = [log_bins_min] + bins_obs + [log_bins_max]
