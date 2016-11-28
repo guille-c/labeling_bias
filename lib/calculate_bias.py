@@ -129,3 +129,4 @@ Ls, Ns = dataAn.getRandomL (intrinsic, observables, y, labels,
 
 print "-------"
 print "L = ", Ls.mean(), " +- ", Ls.std()
+print "$", np.round(Ls.mean(), 3), " \pm ", np.round(Ls.std(), 3), "$"

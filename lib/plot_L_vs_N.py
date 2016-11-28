@@ -223,7 +223,7 @@ for i in range (bins.shape[0]):
                     yerr = Ls_std[:, i][Ls[:, i]!=0], fmt = None, ecolor = color)
 ax.set_xlabel ("number of objects per bin")
 ax.set_ylabel (r"$L$")
-ax.set_ylim ([0.12, 0.55])
+ax.set_ylim ([0.05, 0.32])
 if logx:
     ax.set_xscale("log")
 else:
@@ -238,8 +238,8 @@ if args.logx:
     ax.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
 else:
     ax.legend(loc = "best")
-
-pl.savefig ("L_vs_N_objs_" + str(N_iter) + ".eps")
+pl.grid()
+pl.savefig ("L_vs_N_objs_" + str(N_iter) + "_" + classf[0] + ".eps")
 
 pl.clf()
 for i in range (bins.shape[0]):

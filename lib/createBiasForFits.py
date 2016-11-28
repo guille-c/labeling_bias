@@ -2,7 +2,7 @@ import numpy as np
 #import pylab as pl
 import pyfits as pf
 import astropy as ap
-import astropy.cosmology as cosmo
+from astropy.cosmology import WMAP9 as cosmo
 import argparse
 import os
 import pandas as pd
@@ -12,6 +12,7 @@ def processSelection (hdu, i_ini, i_end, field_r, field_m, field_z, field_psf,
                       p_class1, biases, out_dir, class_fields = False, no_zeros = False):
     out_fn = out_dir + "sim_bias_" + str(i_ini) + "_" + str(i_end) + ".fits"
     if os.path.exists (out_fn):
+        print out_fn, "exists"
         return
     print "selecting data"
     tbdata = hdu.data[i_ini:i_end]
@@ -20,6 +21,7 @@ def processSelection (hdu, i_ini, i_end, field_r, field_m, field_z, field_psf,
     print "tbdata.tolist() done"
     data_aux = np.asarray(tbdata.tolist())
     print "creating rm_crit"
+    print np.isnan (data_aux).shape
     rm_crit = np.isnan (data_aux).any(axis=1) | np.isinf (data_aux).any(axis=1) | (tbdata.field(field_z) <= 0) | (tbdata.field(field_r) <= 0)
     print "is_nan = ", np.isnan (data_aux).any(axis=1).sum()
     print "is_inf = ", np.isinf (data_aux).any(axis=1).sum()
@@ -77,10 +79,10 @@ def processSelection (hdu, i_ini, i_end, field_r, field_m, field_z, field_psf,
             pf.Column (name = "class", array = y, format = "B")]
 
     # Create biased labels
-    r_m = np.median(r)
+    r_m = np.median(r_psf)
     m_m = np.median(m)-17.8
     crit1 = (y == 1)
-    r1 = r[crit1]
+    r1 = r_psf[crit1]
     m1 = m[crit1]-17.8
     factor = np.exp(-(r1*r1/(2*r_m*r_m) + m1*m1/(2*m_m*m_m)))
     factor [m1 >= 0] = np.exp(-(r1[m1 >= 0]**2/(2*r_m*r_m)))
@@ -117,7 +119,7 @@ def concatenate (iters, fields_names, out_dir):
     new_hdu = pf.new_table(cols)
     new_hdu.writeto (out_dir + "all_sims_biased_" + str(conc_data.shape[1]) + ".fits", clobber = True)
 
-cosmo.core.set_current(cosmo.WMAP9)
+#cosmo.core.set_current(cosmo.WMAP9)
 
 parser = argparse.ArgumentParser(description='Simulate morphology bias for fits table.')
 parser.add_argument ("in_file", help = "input fits file.")
@@ -154,8 +156,10 @@ else:
     N_tot = hdu_in.data.shape[0]
 N_iters = int (np.round(1. * N_tot / args.N_iter_lines)) + 1
 iters = np.array (np.round(np.linspace (0, N_tot, N_iters)), dtype = int)
+print iters
+print len(iters)
 for i in range (len(iters) - 1):
-    print "PROCESSING ", iters[i], iters[i + 1]
+    print i, "PROCESSING ", iters[i], iters[i + 1]
     processSelection (hdu_in, iters[i], iters[i + 1], 
                       field_r, field_m, field_z, field_psf, 
                       args.p1, biases, args.out_dir, args.class_fields, no_zeros = args.no_zeros)
