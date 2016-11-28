@@ -14,6 +14,8 @@ class BiasAnalyser ():
     def getFractions (self, x, classes, labels, nx, ini_crit = True,
                       get_is = False, get_N = False, equalBins = False):
 
+        # Create criteria for selecting sources that correspond to
+        # desired labels.
         if np.isscalar (ini_crit):
             crit = np.where(np.in1d (classes, labels))
         else:
@@ -23,6 +25,8 @@ class BiasAnalyser ():
         classes = classes[crit]
 
         N = len(x)
+
+        # If no sources present return empy array.
         if N == 0:
             print "BiasAnalyzer.getFractions N = 0"
             ret = np.array([]), np.array([]), np.array([]), np.array([])
@@ -31,12 +35,17 @@ class BiasAnalyser ():
             if get_N:
                 ret += (N,)
             return ret
+
+        # Create array containing equal number of sources per bin.
         ns = np.array(np.round(np.linspace (0, N, nx + 1)), dtype = int)
         i_s = x.argsort()
         x_means = []
+
+        # Create array for fractions per bin.
         fractions = np.zeros((len(ns)-1, len(labels)))
         i_ret = []
         dx = (x[-1]-x[0]) / nx
+
         for i in range(len(ns) - 2):
             if equalBins:
                 print i, len(equalBins)
@@ -45,9 +54,12 @@ class BiasAnalyser ():
                 i1 = i_s [(x[i_s] >= x1) & (x[i_s] < x2)]
                 Ni = len(i1)
             else:
+                # Select objects in bin i
                 i1 = i_s [ns[i]:ns[i+1]]
                 Ni = ns[i+1] - ns[i]
             x_means.append(x[i1].mean())
+
+            # For each label calculate fractions
             for k in range(len(labels)):
                 fractions[i, k] = 1.*(classes[i1] == labels[k]).sum()/Ni
             i_ret.append(i1)
@@ -160,6 +172,40 @@ class BiasAnalyser ():
                     else:
                         sigma2 [j, k, q] = ((rs[:, k] - rs[-1, k])**2).sum()/bins_obs
         return sigma2
+    
+    def getFractionsPerObject (self, intrinsic, observable, y, labels, 
+                               log2_bins_int, bins_obs, increasing_bias, 
+                               kd_tree = "iterative"):
+        kd_tree = self.KDTree (intrinsic, log2_bins_int, 
+                               np.arange(intrinsic.shape[0]), crit = kd_tree,
+                               y = y, labels = labels)
+        kd_keys = np.unique(kd_tree)
+        sigma2 = np.zeros((observable.shape[1], len(labels), 2**log2_bins_int))
+        output_size = np.concatenate((observable.shape, [len(labels)]))
+        print "output_size = ", output_size
+        int_frac = np.zeros(output_size)
+        obs_frac = np.zeros(output_size)
+
+        for j in range (observable.shape[1]):
+            for q in kd_keys:
+                i_bin_int = (kd_tree == q)
+                is_bin = np.arange(observable.shape[0])[i_bin_int]
+                # rs.shape = (bins_obs, len(labels))
+                fs, rs, i_s = self.getFractions (observable[:, j][i_bin_int], 
+                                            y[i_bin_int], labels, bins_obs,
+                                            get_is = True)
+                for k in range (len(labels)):
+                    for i in range(len(i_s)):
+                        print is_bin[i_s[i]].min(), is_bin[i_s[i]].max()
+                        obs_frac[is_bin[i_s[i]], j, k] = rs[i, k]
+                        if increasing_bias[j]:
+                            int_frac[is_bin[i_s[i]], j, k] = rs[0, k]
+                            #sigma2 [j, k, q] = ((rs[:, k] - rs[0, k])**2).sum()/bins_obs
+                        else:
+                            int_frac[is_bin[i_s[i]], j, k] = rs[-1, k]
+                            #sigma2 [j, k, q] = ((rs[:, k] - rs[-1, k])**2).sum()/bins_obs
+        return int_frac, obs_frac
+        
 
     def getLsBins (self, intrinsic, observable, y, labels, crit = True,
                    bins_in = (5,5), bins_ob = 20, equalN = True, 
